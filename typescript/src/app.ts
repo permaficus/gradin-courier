@@ -1,10 +1,12 @@
 import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import { errorHandler } from "./common/error-handler.js";
 import { courierRoutes } from "./modules/couriers/courier.routes.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
+  app.setErrorHandler(errorHandler);
   await app.register(swagger, {
     openapi: {
       info: { title: "Courier Technical Test API", version: "1.0.0" }

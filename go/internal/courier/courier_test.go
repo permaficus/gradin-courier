@@ -7,14 +7,14 @@ import (
 )
 
 func TestParseQueryRejectsInvalidLevel(t *testing.T) {
-	_, errorsByField := ParseQuery(url.Values{"level": {"2,9"}})
+	_, errorsByField := NewValidator().ParseQuery(url.Values{"level": {"2,9"}})
 	if len(errorsByField["level"]) == 0 {
 		t.Fatal("expected invalid level to be rejected")
 	}
 }
 
 func TestParseQueryParsesMultipleLevels(t *testing.T) {
-	params, errorsByField := ParseQuery(url.Values{"level": {"2,3"}})
+	params, errorsByField := NewValidator().ParseQuery(url.Values{"level": {"2,3"}})
 	if len(errorsByField) > 0 {
 		t.Fatalf("expected valid query, got %#v", errorsByField)
 	}
@@ -24,7 +24,7 @@ func TestParseQueryParsesMultipleLevels(t *testing.T) {
 }
 
 func TestParseQueryRejectsArbitrarySort(t *testing.T) {
-	_, errorsByField := ParseQuery(url.Values{"sort": {"deleted_at"}})
+	_, errorsByField := NewValidator().ParseQuery(url.Values{"sort": {"deleted_at"}})
 	if len(errorsByField["sort"]) == 0 {
 		t.Fatal("expected invalid sort to be rejected")
 	}

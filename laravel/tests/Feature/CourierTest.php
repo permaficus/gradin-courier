@@ -54,6 +54,50 @@ class CourierTest extends TestCase
         $this->getJson('/api/couriers?level=2,3')->assertJsonCount(1, 'data');
     }
 
+    public function test_it_can_filter_couriers_by_single_level(): void
+    {
+        Courier::query()->create(['name' => 'Level Two', 'level' => 2, 'status' => 'active', 'registered_at' => now(), 'created_at' => now(), 'updated_at' => now(), 'deleted_at' => null]);
+        Courier::query()->create(['name' => 'Level Three', 'level' => 3, 'status' => 'active', 'registered_at' => now(), 'created_at' => now(), 'updated_at' => now(), 'deleted_at' => null]);
+
+        $this->getJson('/api/couriers?level=2')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.level', 2);
+    }
+
+    public function test_it_paginates_without_duplicate_records(): void
+    {
+        foreach (range(1, 12) as $number) {
+            Courier::query()->create([
+                'name' => sprintf('Courier %02d', $number),
+                'level' => 1,
+                'status' => 'active',
+                'registered_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+                'deleted_at' => null,
+            ]);
+        }
+
+        $firstPage = $this->getJson('/api/couriers?page=1&per_page=10')
+            ->assertOk()
+            ->assertJsonPath('pagination.page', 1)
+            ->assertJsonPath('pagination.per_page', 10)
+            ->assertJsonPath('pagination.total', 12)
+            ->json('data');
+
+        $secondPage = $this->getJson('/api/couriers?page=2&per_page=10')
+            ->assertOk()
+            ->assertJsonPath('pagination.page', 2)
+            ->assertJsonCount(2, 'data')
+            ->json('data');
+
+        $this->assertEmpty(array_intersect(
+            array_column($firstPage, 'id'),
+            array_column($secondPage, 'id')
+        ));
+    }
+
     public function test_it_can_show_courier(): void
     {
         $courier = Courier::query()->create(['name' => 'Shown', 'level' => 1, 'status' => 'active', 'registered_at' => now(), 'created_at' => now(), 'updated_at' => now(), 'deleted_at' => null]);
@@ -72,6 +116,7 @@ class CourierTest extends TestCase
         $courier = Courier::query()->create(['name' => 'Deleted', 'level' => 1, 'status' => 'active', 'registered_at' => now(), 'created_at' => now(), 'updated_at' => now(), 'deleted_at' => null]);
         $this->deleteJson('/api/couriers/'.$courier->_id)->assertOk();
         $this->getJson('/api/couriers/'.$courier->_id)->assertNotFound();
+        $this->getJson('/api/couriers')->assertJsonMissing(['name' => 'Deleted']);
     }
 
     public function test_it_rejects_invalid_level(): void
@@ -79,8 +124,33 @@ class CourierTest extends TestCase
         $this->getJson('/api/couriers?level=9')->assertBadRequest();
     }
 
+    public function test_it_rejects_invalid_query_parameters(): void
+    {
+        $this->getJson('/api/couriers?page=abc')->assertBadRequest();
+        $this->getJson('/api/couriers?per_page=101')->assertBadRequest();
+        $this->getJson('/api/couriers?sort=deleted_at')->assertBadRequest();
+    }
+
     public function test_it_rejects_invalid_payload(): void
     {
         $this->postJson('/api/couriers', ['name' => '', 'level' => 9])->assertUnprocessable();
+        $this->postJson('/api/couriers', ['level' => 2])->assertUnprocessable();
+        $this->postJson('/api/couriers', ['name' => 'Invalid Email', 'level' => 2, 'email' => 'invalid'])->assertUnprocessable();
+        $this->postJson('/api/couriers', ['name' => 'Invalid Status', 'level' => 2, 'status' => 'unknown'])->assertUnprocessable();
+        $this->postJson('/api/couriers', ['name' => str_repeat('a', 151), 'level' => 2])->assertUnprocessable();
+    }
+
+    public function test_it_returns_not_found_for_invalid_id(): void
+    {
+        $this->getJson('/api/couriers/not-a-valid-object-id')->assertNotFound();
+    }
+
+    public function test_it_reuses_request_id_header(): void
+    {
+        $this->withHeader('x-request-id', 'test-request-id')
+            ->getJson('/api/couriers')
+            ->assertOk()
+            ->assertHeader('x-request-id', 'test-request-id')
+            ->assertJsonPath('meta.request_id', 'test-request-id');
     }
 }

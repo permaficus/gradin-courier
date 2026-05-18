@@ -2,6 +2,4 @@
 
 namespace App\Http\Requests;
 
-class UpdateCourierRequest extends StoreCourierRequest
-{
-}
+class UpdateCourierRequest extends StoreCourierRequest {}

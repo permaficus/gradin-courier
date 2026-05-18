@@ -3,9 +3,6 @@ package courier
 import (
 	"context"
 	"errors"
-	"math"
-	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,12 +12,21 @@ import (
 
 var ErrNotFound = errors.New("courier not found")
 var ErrInvalidID = errors.New("invalid courier id")
+var ErrInvalidRegisteredAt = errors.New("invalid registered_at")
 
 type Service struct {
-	repository *Repository
+	repository Store
 }
 
-func NewService(repository *Repository) *Service {
+type Store interface {
+	Create(ctx context.Context, courier Courier) (Courier, error)
+	List(ctx context.Context, params QueryParams) (ListResult, error)
+	FindByID(ctx context.Context, id bson.ObjectID) (Courier, error)
+	Update(ctx context.Context, id bson.ObjectID, courier Courier) (Courier, error)
+	SoftDelete(ctx context.Context, id bson.ObjectID, deletedAt time.Time) error
+}
+
+func NewService(repository Store) *Service {
 	return &Service{repository: repository}
 }
 
@@ -28,7 +34,7 @@ func (service *Service) Create(ctx context.Context, payload CourierPayload) (Cou
 	now := time.Now().UTC()
 	registeredAt, err := parseRegisteredAt(payload.RegisteredAt, now)
 	if err != nil {
-		return Courier{}, err
+		return Courier{}, ErrInvalidRegisteredAt
 	}
 	status := "active"
 	if payload.Status != nil && *payload.Status != "" {
@@ -41,16 +47,8 @@ func (service *Service) Create(ctx context.Context, payload CourierPayload) (Cou
 	})
 }
 
-func (service *Service) List(ctx context.Context, raw url.Values) (ListResult, map[string][]string) {
-	params, validationErrors := ParseQuery(raw)
-	if len(validationErrors) > 0 {
-		return ListResult{}, validationErrors
-	}
-	result, err := service.repository.List(ctx, params)
-	if err != nil {
-		return ListResult{}, map[string][]string{"database": []string{err.Error()}}
-	}
-	return result, nil
+func (service *Service) List(ctx context.Context, params QueryParams) (ListResult, error) {
+	return service.repository.List(ctx, params)
 }
 
 func (service *Service) Find(ctx context.Context, id string) (Courier, error) {
@@ -79,7 +77,7 @@ func (service *Service) Update(ctx context.Context, id string, payload CourierPa
 	}
 	registeredAt, err := parseRegisteredAt(payload.RegisteredAt, current.RegisteredAt)
 	if err != nil {
-		return Courier{}, err
+		return Courier{}, ErrInvalidRegisteredAt
 	}
 	status := "active"
 	if payload.Status != nil && *payload.Status != "" {
@@ -103,41 +101,6 @@ func (service *Service) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	return nil
-}
-
-func ParseQuery(raw url.Values) (QueryParams, map[string][]string) {
-	errorsByField := map[string][]string{}
-	page := intParam(raw.Get("page"), 1, 1, math.MaxInt, "page", errorsByField)
-	perPage := intParam(raw.Get("per_page"), 10, 1, 100, "per_page", errorsByField)
-	sort := raw.Get("sort")
-	allowedSort := map[string]bool{"": true, "name": true, "-name": true, "registered_at": true, "-registered_at": true, "created_at": true, "-created_at": true}
-	if !allowedSort[sort] {
-		errorsByField["sort"] = []string{"The sort field is invalid."}
-	}
-	levels := []int{}
-	if levelRaw := strings.TrimSpace(raw.Get("level")); levelRaw != "" {
-		for _, part := range strings.Split(levelRaw, ",") {
-			level, err := strconv.Atoi(strings.TrimSpace(part))
-			if err != nil || level < 1 || level > 5 {
-				errorsByField["level"] = []string{"The level query must contain only levels 1 to 5."}
-				break
-			}
-			levels = append(levels, level)
-		}
-	}
-	return QueryParams{Page: page, PerPage: perPage, Sort: sort, Search: raw.Get("search"), Levels: levels}, errorsByField
-}
-
-func intParam(raw string, fallback int, min int, max int, field string, errorsByField map[string][]string) int {
-	if strings.TrimSpace(raw) == "" {
-		return fallback
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value < min || value > max {
-		errorsByField[field] = []string{"The " + field + " query is invalid."}
-		return fallback
-	}
-	return value
 }
 
 func parseRegisteredAt(raw *string, fallback time.Time) (time.Time, error) {
