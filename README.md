@@ -6,8 +6,6 @@ This repository contains three backend implementations of the same Courier/Kurir
 - `go/`
 - `typescript/`
 
-The business flow follows the original Laravel-oriented brief in `BRD.md`, while the public repository excludes `BRD.md`, `AGENTS.md`, and `.ai/` from git.
-
 ## Stack Overview
 
 All implementations use MongoDB for Courier persistence and expose the same public API shape under:
