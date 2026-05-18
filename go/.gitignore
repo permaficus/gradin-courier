@@ -1,0 +1,30 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build output
+bin/
+dist/
+build/
+tmp/
+*.out
+*.test
+*.prof
+coverage/
+coverage.out
+
+# Go caches and workspace files
+.cache/
+vendor/
+go.work
+go.work.sum
+
+# Logs
+*.log
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp

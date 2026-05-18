@@ -1,0 +1,80 @@
+services:
+  mongodb:
+    image: mongo:8
+    container_name: courier-technical-test-mongodb
+    restart: unless-stopped
+    entrypoint:
+      - /bin/bash
+      - -lc
+      - |
+        echo "$$MONGO_REPLICA_SET_KEY" > /tmp/mongodb-keyfile &&
+        chmod 400 /tmp/mongodb-keyfile &&
+        chown mongodb:mongodb /tmp/mongodb-keyfile &&
+        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /tmp/mongodb-keyfile
+    ports:
+      - "27019:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongodb
+      MONGO_INITDB_ROOT_PASSWORD: mongodb12345
+      MONGO_REPLICA_SET_KEY: localdevreplicasetkeylocaldevreplicasetkey
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongodb/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "mongodb", "-p", "mongodb12345", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  laravel:
+    build:
+      context: ./laravel
+    container_name: courier-technical-test-laravel
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: local
+      APP_PORT: 8000
+      MONGODB_URI: mongodb://mongodb:mongodb12345@mongodb:27017/?authSource=admin
+      MONGODB_DATABASE: gradin-courier
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  go:
+    build:
+      context: ./go
+    container_name: courier-technical-test-go
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV: local
+      APP_PORT: 8080
+      MONGODB_URI: mongodb://mongodb:mongodb12345@mongodb:27017/?authSource=admin
+      MONGODB_DATABASE: gradin-courier
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  typescript:
+    build:
+      context: ./typescript
+    container_name: courier-technical-test-typescript
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      APP_PORT: 3001
+      MONGODB_URI: mongodb://mongodb:mongodb12345@mongodb:27017/?authSource=admin
+      MONGODB_DATABASE: gradin-courier
+      DATABASE_URL: mongodb://mongodb:mongodb12345@mongodb:27017/gradin-courier?authSource=admin&replicaSet=rs0
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+volumes:
+  mongodb_data:

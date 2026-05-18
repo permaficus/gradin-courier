@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Courier {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  email        String?   @unique
+  phone        String?
+  level        Int
+  vehicleType  String?   @map("vehicle_type")
+  licensePlate String?   @map("license_plate")
+  status       String    @default("active")
+  registeredAt DateTime  @default(now()) @map("registered_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  @@index([name])
+  @@index([level])
+  @@index([registeredAt])
+  @@map("couriers")
+}
