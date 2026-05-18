@@ -86,22 +86,36 @@ func (repository *Repository) FindByID(ctx context.Context, id bson.ObjectID) (C
 }
 
 func (repository *Repository) Update(ctx context.Context, id bson.ObjectID, courier Courier) (Courier, error) {
-	update := bson.M{"$set": bson.M{
+	set := bson.M{
 		"name":          courier.Name,
-		"email":         courier.Email,
-		"phone":         courier.Phone,
 		"level":         courier.Level,
-		"vehicle_type":  courier.VehicleType,
-		"license_plate": courier.LicensePlate,
 		"status":        courier.Status,
 		"registered_at": courier.RegisteredAt,
 		"updated_at":    courier.UpdatedAt,
-	}}
+	}
+	unset := bson.M{}
+	applyOptionalString(set, unset, "email", courier.Email)
+	applyOptionalString(set, unset, "phone", courier.Phone)
+	applyOptionalString(set, unset, "vehicle_type", courier.VehicleType)
+	applyOptionalString(set, unset, "license_plate", courier.LicensePlate)
+
+	update := bson.M{"$set": set}
+	if len(unset) > 0 {
+		update["$unset"] = unset
+	}
 	_, err := repository.collection.UpdateOne(ctx, bson.M{"_id": id, "deleted_at": nil}, update)
 	if err != nil {
 		return Courier{}, err
 	}
 	return repository.FindByID(ctx, id)
+}
+
+func applyOptionalString(set bson.M, unset bson.M, field string, value *string) {
+	if value == nil {
+		unset[field] = ""
+		return
+	}
+	set[field] = value
 }
 
 func (repository *Repository) SoftDelete(ctx context.Context, id bson.ObjectID, deletedAt time.Time) error {

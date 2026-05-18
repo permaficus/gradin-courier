@@ -10,9 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class CourierService
 {
-    public function __construct(private readonly CourierRepository $couriers)
-    {
-    }
+    public function __construct(private readonly CourierRepository $couriers) {}
 
     public function list(array $query): LengthAwarePaginator
     {
@@ -46,9 +44,31 @@ class CourierService
         return $this->couriers->update($courier, $data);
     }
 
+    public function updateById(string $id, array $data): ?Courier
+    {
+        $courier = $this->find($id);
+        if (! $courier) {
+            return null;
+        }
+
+        return $this->update($courier, $data);
+    }
+
     public function delete(Courier $courier): void
     {
         $this->couriers->softDelete($courier);
+    }
+
+    public function deleteById(string $id): bool
+    {
+        $courier = $this->find($id);
+        if (! $courier) {
+            return false;
+        }
+
+        $this->delete($courier);
+
+        return true;
     }
 
     private function parseQuery(array $query): array

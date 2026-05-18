@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\Courier;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
+use MongoDB\BSON\Regex;
 
 class CourierRepository
 {
@@ -17,7 +18,7 @@ class CourierRepository
         }
 
         foreach ($filters['search_words'] as $word) {
-            $query->where('name', 'regex', new \MongoDB\BSON\Regex(preg_quote($word), 'i'));
+            $query->where('name', 'regex', new Regex(preg_quote($word), 'i'));
         }
 
         $query->orderBy($filters['sort_field'], $filters['sort_direction']);
